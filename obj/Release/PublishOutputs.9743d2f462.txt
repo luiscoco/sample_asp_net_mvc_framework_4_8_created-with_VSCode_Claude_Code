@@ -1,0 +1,15 @@
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\SampleMvcApp.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\SampleMvcApp.pdb
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Antlr3.Runtime.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Mvc.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Razor.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Optimization.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Helpers.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.WebPages.Deployment.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.WebPages.Razor.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.WebPages.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebMatrix.Data.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebMatrix.WebData.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.Web.Infrastructure.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Newtonsoft.Json.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebGrease.dll
