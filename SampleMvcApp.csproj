@@ -24,6 +24,7 @@
     <PackageReference Include="bootstrap" Version="3.4.1" />
     <PackageReference Include="jQuery" Version="3.7.1" />
     <PackageReference Include="Microsoft.AspNet.WebPages.WebData" Version="3.3.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.Web" Version="2.22.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Web.config" />
@@ -32,6 +33,7 @@
     <Content Include="Scripts\**\*" />
     <Content Include="Views\**\*" />
     <Content Include="App_Data\**\*" />
+    <Content Include="ApplicationInsights.config" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Views\Web.config" />

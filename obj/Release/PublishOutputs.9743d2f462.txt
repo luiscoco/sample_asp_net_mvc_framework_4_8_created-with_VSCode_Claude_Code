@@ -1,8 +1,16 @@
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\SampleMvcApp.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\SampleMvcApp.pdb
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Antlr3.Runtime.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.ApplicationInsights.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.Agent.Intercept.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.DependencyCollector.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.PerfCounterCollector.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.Web.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.WindowsServer.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AI.ServerTelemetryChannel.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Mvc.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Razor.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.AspNet.TelemetryCorrelation.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Optimization.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.Helpers.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Web.WebPages.Deployment.dll
@@ -12,4 +20,9 @@ C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebMatrix.Data.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebMatrix.WebData.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Microsoft.Web.Infrastructure.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\Newtonsoft.Json.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Buffers.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Diagnostics.DiagnosticSource.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Memory.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Numerics.Vectors.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\System.Runtime.CompilerServices.Unsafe.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\WebGrease.dll

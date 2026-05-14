@@ -22,3 +22,16 @@ C:\Codere Admira\sample_asp_net_mvc_framework_4_8\obj\Release\SampleMvcApp.sourc
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\obj\Release\SampleMv.3E08893C.Up2Date
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\obj\Release\SampleMvcApp.dll
 C:\Codere Admira\sample_asp_net_mvc_framework_4_8\obj\Release\SampleMvcApp.pdb
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.ApplicationInsights.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.Agent.Intercept.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.DependencyCollector.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.PerfCounterCollector.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.Web.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.WindowsServer.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AI.ServerTelemetryChannel.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\Microsoft.AspNet.TelemetryCorrelation.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\System.Buffers.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\System.Diagnostics.DiagnosticSource.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\System.Memory.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\System.Numerics.Vectors.dll
+C:\Codere Admira\sample_asp_net_mvc_framework_4_8\bin\System.Runtime.CompilerServices.Unsafe.dll
