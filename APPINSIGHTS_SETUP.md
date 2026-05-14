@@ -120,7 +120,7 @@ az webapp config appsettings set `
 
 ## Part 2 — Code changes
 
-Four files were created or modified.
+Five files were created or modified.
 
 ### Change 1 — NuGet package (`SampleMvcApp.csproj`)
 
@@ -189,9 +189,9 @@ Key sections:
 
 > **Why adaptive sampling?** The Free tier of App Insights has a 5 GB/month data cap. Adaptive sampling automatically reduces volume when traffic is high, keeping data costs in check without requiring manual configuration.
 
-### Change 3 — `Web.config` (appSettings)
+### Change 3 — `Web.config` (five sections updated)
 
-Added the connection string to `appSettings` so it is available to the Razor view engine when rendering the JavaScript snippet:
+**3a — appSettings:** Added the connection string so it is available to the Razor view engine when rendering the JavaScript snippet:
 
 ```xml
 <add key="APPINSIGHTS_CONNECTIONSTRING"
@@ -199,6 +199,72 @@ Added the connection string to `appSettings` so it is available to the Razor vie
 ```
 
 > At runtime on Azure, this value is overridden by the Azure Web App application setting of the same name, so the config file value only applies when running locally.
+
+**3b — HTTP modules (Fix required — not auto-added by PackageReference):**
+
+With `PackageReference`, NuGet no longer runs `install.ps1` scripts, so the App Insights HTTP modules are never registered automatically. Without them, the SDK cannot intercept HTTP requests and the application crashes with a `FileLoadException` cascade on startup. Both sections must be present: `<system.web><httpModules>` for Classic mode and `<system.webServer><modules>` for Integrated mode (Azure uses Integrated):
+
+```xml
+<system.web>
+  <httpModules>
+    <add name="TelemetryCorrelationHttpModule"
+         type="Microsoft.AspNet.TelemetryCorrelation.TelemetryCorrelationHttpModule, Microsoft.AspNet.TelemetryCorrelation" />
+    <add name="ApplicationInsightsWebTracking"
+         type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web" />
+  </httpModules>
+</system.web>
+
+<system.webServer>
+  <modules>
+    <remove name="TelemetryCorrelationHttpModule" />
+    <add name="TelemetryCorrelationHttpModule"
+         type="Microsoft.AspNet.TelemetryCorrelation.TelemetryCorrelationHttpModule, Microsoft.AspNet.TelemetryCorrelation"
+         preCondition="integratedMode,managedHandler" />
+    <remove name="ApplicationInsightsWebTracking" />
+    <add name="ApplicationInsightsWebTracking"
+         type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web"
+         preCondition="managedHandler" />
+  </modules>
+</system.webServer>
+```
+
+**3c — Polyfill assembly binding redirects (Fix required):**
+
+`Microsoft.ApplicationInsights.Web` 2.22.0 ships with newer versions of five polyfill assemblies than those in the .NET Framework 4.8 GAC. Each mismatch causes a `FileLoadException` at startup. The actual versions were confirmed with:
+
+```powershell
+$bin = ".\publish\bin"
+@("System.Diagnostics.DiagnosticSource","System.Runtime.CompilerServices.Unsafe",
+  "System.Memory","System.Buffers","System.Numerics.Vectors") | ForEach-Object {
+    $v = [System.Reflection.AssemblyName]::GetAssemblyName("$bin\$_.dll").Version
+    Write-Host "$_  →  $v"
+}
+```
+
+All five binding redirects added to the `<runtime><assemblyBinding>` section:
+
+```xml
+<dependentAssembly>
+  <assemblyIdentity name="System.Diagnostics.DiagnosticSource" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-5.0.0.0" newVersion="5.0.0.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Runtime.CompilerServices.Unsafe" publicKeyToken="b03f5f7f11d50a3a" />
+  <bindingRedirect oldVersion="0.0.0.0-5.0.0.0" newVersion="5.0.0.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Memory" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-4.0.1.1" newVersion="4.0.1.1" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Buffers" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-4.0.3.0" newVersion="4.0.3.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Numerics.Vectors" publicKeyToken="b03f5f7f11d50a3a" />
+  <bindingRedirect oldVersion="0.0.0.0-4.1.4.0" newVersion="4.1.4.0" />
+</dependentAssembly>
+```
 
 ### Change 4 — `Views/Shared/_Layout.cshtml` (JavaScript SDK)
 
@@ -281,11 +347,46 @@ az webapp deploy `
 
 ---
 
+## Part 4 — Fixes applied during setup
+
+### Fix 1 — HTTP modules not registered (app returns HTTP 500 immediately)
+
+**Symptom:** After deploying with App Insights added, every request returns HTTP 500. Enabling `<customErrors mode="Off" />` reveals: `Could not load file or assembly 'System.Diagnostics.DiagnosticSource'`.
+
+**Root cause:** `PackageReference` does not execute `install.ps1` scripts, so `TelemetryCorrelationHttpModule` and `ApplicationInsightsHttpModule` are never added to `Web.config`. The HTTP modules are the entry point for the SDK — without them, IIS tries to load App Insights assemblies through a different code path that fails due to version mismatches.
+
+**Fix:** Manually register both modules in `Web.config` (see Change 3b above).
+
+### Fix 2 — Polyfill assembly version cascade (five `FileLoadException` errors)
+
+**Symptom:** After fixing the HTTP modules, the app returned HTTP 500 five more times, each time with a different `FileLoadException` for a polyfill assembly (`System.Diagnostics.DiagnosticSource`, `System.Runtime.CompilerServices.Unsafe`, `System.Memory`, `System.Buffers`, `System.Numerics.Vectors`).
+
+**Root cause:** The App Insights SDK 2.22.0 ships with .NET 5-era polyfill assemblies. The .NET Framework 4.8 GAC has older versions of the same assemblies. IIS resolves the GAC version first, the versions don't match, and the CLR throws `FileLoadException`.
+
+**Diagnosis approach:**
+```powershell
+# For each failing assembly, check the real version in bin\
+[System.Reflection.AssemblyName]::GetAssemblyName(".\publish\bin\System.Diagnostics.DiagnosticSource.dll").Version
+# → 5.0.0.0  (but 4.0.4.0 was requested → add redirect to 5.0.0.0)
+```
+
+**Fix:** Added five `<bindingRedirect>` entries to `Web.config` (see Change 3c above).
+
+### Fix 3 — Log Analytics workspace has 5–15 minute ingestion lag
+
+**Symptom:** Queries against `az monitor log-analytics query` returned empty results even after the app was confirmed to be sending telemetry.
+
+**Root cause:** For workspace-based App Insights, telemetry flows: App → App Insights ingestion endpoint → Log Analytics workspace. The final hop to Log Analytics has a 5–15 minute propagation delay. The `az monitor log-analytics query` command targets the workspace directly and misses recent data.
+
+**Fix:** Use the **App Insights REST API** (`api.applicationinsights.io`) for queries — it reflects ingested data within seconds. See `APPINSIGHTS_QUERIES.md` for working examples of both query methods.
+
+---
+
 ## Verifying telemetry in the Azure Portal
 
 1. Open the [Azure Portal](https://portal.azure.com)
 2. Navigate to **CodereSampleMVCLegacy** → **CodereMVCAppInsights**
-3. Browse to the deployed app to generate traffic
+3. Browse to the deployed app at `https://codere-sample-mvc-legacy.azurewebsites.net` to generate traffic
 4. In the App Insights blade, check:
    - **Overview** — live request rate, failure rate, response time
    - **Live Metrics** — real-time stream (< 1 second delay)
@@ -293,22 +394,37 @@ az webapp deploy `
    - **Failures** — exception details with stack traces
    - **Performance** — response time breakdown by operation
 
-Telemetry typically appears in the portal within **1–2 minutes** of the first request.
+Telemetry typically appears in the **Overview** within **1–2 minutes** of the first request. Log Analytics queries (`AppRequests` table) may take **5–15 minutes** to reflect new data.
 
 ---
 
-## Useful CLI queries
+## Running queries — two methods
+
+### Method 1: App Insights REST API (real-time, seconds delay)
 
 ```powershell
-# Query recent requests via Log Analytics
-az monitor log-analytics query `
-  --workspace CodereMVCLogAnalytics `
-  --analytics-query "requests | order by timestamp desc | take 10 | project timestamp, name, resultCode, duration" `
-  --output table
+$appId  = "b555c2cd-b2ce-4d7e-8b88-8bccbe74dea7"
+$token  = az account get-access-token --resource "https://api.applicationinsights.io" --query accessToken --output tsv
+$query  = "requests | order by timestamp desc | take 10 | project timestamp, name, resultCode, duration, success"
+$enc    = [uri]::EscapeDataString($query)
 
-# Query exceptions
+Invoke-RestMethod `
+  -Uri "https://api.applicationinsights.io/v1/apps/$appId/query?query=$enc&timespan=PT2H" `
+  -Headers @{ Authorization = "Bearer $token" }
+```
+
+Table names used by this API: `requests`, `exceptions`, `dependencies`, `pageViews`, `traces`, `customEvents`.
+
+### Method 2: Log Analytics workspace (5–15 min lag, use for dashboards/alerts)
+
+```powershell
 az monitor log-analytics query `
-  --workspace CodereMVCLogAnalytics `
-  --analytics-query "exceptions | order by timestamp desc | take 10 | project timestamp, type, outerMessage" `
+  --workspace "8675ad26-45ec-4a6c-a56d-82038a06e6a8" `
+  --timespan "PT2H" `
+  --analytics-query "AppRequests | order by TimeGenerated desc | take 10" `
   --output table
 ```
+
+Table names in Log Analytics differ: `AppRequests`, `AppExceptions`, `AppDependencies`, `AppPageViews`, `AppTraces`, `AppEvents`.
+
+> See `APPINSIGHTS_QUERIES.md` for a full set of KQL sample queries with real output.

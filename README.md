@@ -17,6 +17,7 @@ SampleMvcApp.csproj          ← SDK-style project file targeting net48
 Web.config                   ← ASP.NET runtime configuration and assembly binding redirects
 Global.asax                  ← Application entry point directive
 Global.asax.cs               ← MvcApplication class — wires up routes, filters, and bundles
+ApplicationInsights.config   ← App Insights telemetry modules, processors, and channel config
 App_Start/
   RouteConfig.cs             ← Defines the default {controller}/{action}/{id} route
   FilterConfig.cs            ← Registers HandleErrorAttribute globally
@@ -31,7 +32,7 @@ Views/
     About.cshtml
     Contact.cshtml
   Shared/
-    _Layout.cshtml           ← Bootstrap 3 navbar shell used by all pages
+    _Layout.cshtml           ← Bootstrap 3 navbar shell + App Insights JavaScript SDK loader
     Error.cshtml             ← Displayed by HandleErrorAttribute on unhandled exceptions
 Content/
   bootstrap.css
@@ -168,9 +169,81 @@ Copy-Item "...\bootstrap\dist\fonts\*" ".\fonts\"
 
 ### Fix 4 — Modernizr not available
 
+
+
 **Cause:** `Modernizr 2.8.3` is listed as a NuGet package but is not available on npm at that version. The `BundleConfig` referenced `~/Scripts/modernizr-*` which would have caused the same directory error as Fix 3.
 
 **Fix:** Removed Modernizr from `BundleConfig.cs`, from the `_Layout.cshtml` render call, and from the `.csproj` package reference. Modernizr is a browser feature-detection library and is not required for the application to function.
+
+### Fix 5 — App Insights HTTP modules not registered (HTTP 500 after adding App Insights)
+
+**Error:** HTTP 500 — `Could not load file or assembly 'System.Diagnostics.DiagnosticSource'`
+
+**Cause:** With `PackageReference` (SDK-style projects), the App Insights NuGet package does **not** automatically register its IIS HTTP modules in `Web.config`. In classic `packages.config` projects this was done by an `install.ps1` script that ran on package install. That script does not run with PackageReference. Without the modules, the SDK never intercepts requests and the app crashes at startup.
+
+**Fix:** Added the two required HTTP modules manually to `Web.config` in both `<system.web>` (Classic mode) and `<system.webServer>` (Integrated mode — used by Azure):
+
+```xml
+<system.web>
+  <httpModules>
+    <add name="TelemetryCorrelationHttpModule"
+         type="Microsoft.AspNet.TelemetryCorrelation.TelemetryCorrelationHttpModule, Microsoft.AspNet.TelemetryCorrelation" />
+    <add name="ApplicationInsightsWebTracking"
+         type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web" />
+  </httpModules>
+</system.web>
+<system.webServer>
+  <modules>
+    <remove name="TelemetryCorrelationHttpModule" />
+    <add name="TelemetryCorrelationHttpModule"
+         type="Microsoft.AspNet.TelemetryCorrelation.TelemetryCorrelationHttpModule, Microsoft.AspNet.TelemetryCorrelation"
+         preCondition="integratedMode,managedHandler" />
+    <remove name="ApplicationInsightsWebTracking" />
+    <add name="ApplicationInsightsWebTracking"
+         type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web"
+         preCondition="managedHandler" />
+  </modules>
+</system.webServer>
+```
+
+### Fix 6 — Polyfill assembly version mismatches (five binding redirects)
+
+**Error (chain):** After Fix 5, a cascade of `FileLoadException` errors appeared one assembly at a time: `System.Diagnostics.DiagnosticSource` (requested `4.0.4.0`, found `5.0.0.0`), `System.Runtime.CompilerServices.Unsafe` (requested `4.0.4.1`, found `5.0.0.0`), and then `System.Memory`, `System.Buffers`, `System.Numerics.Vectors`.
+
+**Cause:** `Microsoft.ApplicationInsights.Web` 2.22.0 ships with modern versions of these polyfill assemblies. The .NET Framework 4.8 GAC contains older versions of the same assemblies under the same name. IIS finds the GAC version first and rejects it because the version doesn't match what the App Insights SDK was compiled against.
+
+**Diagnosis:** For each failing assembly, checked the actual version in `bin\` with PowerShell:
+```powershell
+[System.Reflection.AssemblyName]::GetAssemblyName(".\publish\bin\System.Diagnostics.DiagnosticSource.dll").Version
+# → 5.0.0.0
+```
+
+**Fix:** Added five binding redirects to `Web.config` covering all polyfill assemblies brought in by the App Insights SDK:
+
+```xml
+<dependentAssembly>
+  <assemblyIdentity name="System.Diagnostics.DiagnosticSource" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-5.0.0.0" newVersion="5.0.0.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Runtime.CompilerServices.Unsafe" publicKeyToken="b03f5f7f11d50a3a" />
+  <bindingRedirect oldVersion="0.0.0.0-5.0.0.0" newVersion="5.0.0.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Memory" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-4.0.1.1" newVersion="4.0.1.1" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Buffers" publicKeyToken="cc7b13ffcd2ddd51" />
+  <bindingRedirect oldVersion="0.0.0.0-4.0.3.0" newVersion="4.0.3.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="System.Numerics.Vectors" publicKeyToken="b03f5f7f11d50a3a" />
+  <bindingRedirect oldVersion="0.0.0.0-4.1.4.0" newVersion="4.1.4.0" />
+</dependentAssembly>
+```
+
+> **Tip — diagnosing hidden 500 errors on Azure:** When a remote 500 gives no detail, temporarily add `<customErrors mode="Off" />` inside `<system.web>` in `Web.config`, redeploy, and refresh. The full exception and stack trace appear in the browser. Remove it once the issue is resolved — it exposes internal details publicly.
 
 ---
 

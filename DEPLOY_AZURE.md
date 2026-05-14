@@ -85,9 +85,10 @@ az appservice plan create `
   --name CodereMVCFreePlan `
   --resource-group CodereSampleMVCLegacy `
   --sku F1 `
-  --is-windows `
   --location westeurope
 ```
+
+> **Note:** The `--is-windows` flag was removed in Azure CLI 2.80.0. Windows is now the default OS when `--is-linux` is not present. Passing `--is-windows` causes an error on CLI 2.80.0 and later.
 
 Verify the plan was created:
 
@@ -154,8 +155,9 @@ New-Item -ItemType Directory -Force -Path "$pub\bin" | Out-Null
 Get-ChildItem "$pub\*.dll","$pub\*.pdb" | Move-Item -Destination "$pub\bin\" -Force
 
 # Copy web root files
-Copy-Item "$proj\Web.config"  "$pub\Web.config"  -Force
-Copy-Item "$proj\Global.asax" "$pub\Global.asax" -Force
+Copy-Item "$proj\Web.config"                 "$pub\Web.config"                 -Force
+Copy-Item "$proj\Global.asax"                "$pub\Global.asax"                -Force
+Copy-Item "$proj\ApplicationInsights.config" "$pub\ApplicationInsights.config" -Force
 
 # Copy web content folders
 Copy-Item "$proj\Views"   "$pub\Views"   -Recurse -Force
@@ -168,14 +170,17 @@ The final `publish\` structure should look like this:
 
 ```
 publish\
-  bin\           ← SampleMvcApp.dll + all dependency DLLs
-  Content\       ← bootstrap.css, site.css
-  Scripts\       ← jquery-3.7.1.js, bootstrap.js
-  fonts\         ← Bootstrap Glyphicon fonts
-  Views\         ← All Razor views + Views\Web.config
+  bin\                       ← SampleMvcApp.dll + all dependency DLLs
+  Content\                   ← bootstrap.css, site.css
+  Scripts\                   ← jquery-3.7.1.js, bootstrap.js
+  fonts\                     ← Bootstrap Glyphicon fonts
+  Views\                     ← All Razor views + Views\Web.config
+  ApplicationInsights.config ← App Insights SDK configuration
   Web.config
   Global.asax
 ```
+
+> **Why copy `ApplicationInsights.config` explicitly?** The App Insights MSBuild target does copy this file to the compiler output directory (`bin\`), but IIS expects it in the web root alongside `Web.config`. Always copy it from the project root to the publish root.
 
 ---
 
@@ -243,15 +248,22 @@ az webapp log tail `
 
 ---
 
-## Fixes discovered during first deployment
+## Fixes discovered during deployment
 
 ### Fix A — `--is-windows` flag removed in Azure CLI 2.80.0
 
-The flag `--is-windows` for `az appservice plan create` was deprecated and removed. Windows is now the default OS when no `--is-linux` flag is passed. The working command omits `--is-windows` entirely.
+The flag `--is-windows` for `az appservice plan create` was deprecated and removed in Azure CLI 2.80.0. Windows is now the default OS when no `--is-linux` flag is passed. The working command omits `--is-windows` entirely. Passing it on CLI 2.80.0+ produces: `ERROR: unrecognized arguments: --is-windows`.
 
 ### Fix B — `dotnet publish` does not copy web content files
 
-`Microsoft.NET.Sdk` (the SDK used by this project) only copies compiled DLLs to the publish output. It does not include Views, Content, Scripts, fonts, Web.config, or Global.asax. These files must be copied manually after publish (see Step 6 above). This is a known difference from the classic Visual Studio publish experience.
+`Microsoft.NET.Sdk` (the SDK used by this project) only copies compiled DLLs to the publish output. It does not include Views, Content, Scripts, fonts, Web.config, Global.asax, or `ApplicationInsights.config`. These files must be copied manually after publish (see Step 6 above). This is a known difference from the classic Visual Studio publish experience.
+
+### Fix C — Resource group did not exist
+
+The resource group `CodereSampleMVCLegacy` was specified by the user but had not been provisioned yet. It was created with:
+```powershell
+az group create --name CodereSampleMVCLegacy --location westeurope
+```
 
 ---
 
@@ -260,22 +272,29 @@ The flag `--is-windows` for `az appservice plan create` was deprecated and remov
 Every time you change the application code, repeat Steps 6 → 7 → 8:
 
 ```powershell
+$pub  = "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish"
+$proj = "C:\Codere Admira\sample_asp_net_mvc_framework_4_8"
+
 # 1. Publish
-dotnet publish "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\SampleMvcApp.csproj" `
-  --configuration Release `
-  --output "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish"
+Remove-Item $pub -Recurse -Force -ErrorAction SilentlyContinue
+dotnet publish "$proj\SampleMvcApp.csproj" --configuration Release --output $pub
 
-# 2. Zip
-Compress-Archive `
-  -Path "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\publish\*" `
-  -DestinationPath "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\deploy.zip" `
-  -Force
+# 2. Restructure
+New-Item -ItemType Directory -Force -Path "$pub\bin" | Out-Null
+Get-ChildItem "$pub\*.dll","$pub\*.pdb" | Move-Item -Destination "$pub\bin\" -Force
+Copy-Item "$proj\Web.config","$proj\Global.asax","$proj\ApplicationInsights.config" -Destination $pub -Force
+Copy-Item "$proj\Views","$proj\Content","$proj\Scripts","$proj\fonts" -Destination $pub -Recurse -Force
 
-# 3. Deploy
+# 3. Zip
+$zip = "$proj\deploy.zip"
+Remove-Item $zip -Force -ErrorAction SilentlyContinue
+Compress-Archive -Path "$pub\*" -DestinationPath $zip -Force
+
+# 4. Deploy
 az webapp deploy `
   --name codere-sample-mvc-legacy `
   --resource-group CodereSampleMVCLegacy `
-  --src-path "C:\Codere Admira\sample_asp_net_mvc_framework_4_8\deploy.zip" `
+  --src-path $zip `
   --type zip
 ```
 
@@ -285,19 +304,39 @@ az webapp deploy `
 
 ### The app returns HTTP 500 after deployment
 
-Enable detailed error messages by turning on application logging in the Azure Portal, or from the CLI:
+**Step 1 — Expose the full exception in the browser.** Add `<customErrors mode="Off" />` inside `<system.web>` in `Web.config`, copy it to the publish folder, rezip, and redeploy. The browser will then show the full exception message and stack trace instead of the generic error page.
+
+```xml
+<system.web>
+  <customErrors mode="Off" />
+  ...
+</system.web>
+```
+
+> **Remove `customErrors mode="Off"` once the issue is diagnosed** — it exposes internal details publicly.
+
+**Step 2 — Stream live logs from the CLI:**
 
 ```powershell
 az webapp log config `
   --name codere-sample-mvc-legacy `
   --resource-group CodereSampleMVCLegacy `
   --application-logging filesystem `
-  --level verbose
+  --level error
 
 az webapp log tail `
   --name codere-sample-mvc-legacy `
   --resource-group CodereSampleMVCLegacy
 ```
+
+**Step 3 — Check for assembly version mismatches.** The most common cause of 500 errors after adding new NuGet packages to a .NET Framework project is a `FileLoadException` where a DLL version in `bin\` doesn't match the binding redirect in `Web.config`. Diagnose with:
+
+```powershell
+# Check actual version of any DLL in bin\
+[System.Reflection.AssemblyName]::GetAssemblyName(".\publish\bin\AssemblyName.dll").Version
+```
+
+Then update the `<bindingRedirect>` in `Web.config` to match. See **Fix 6** in `README.md` for the full list of redirects added for the App Insights polyfill assemblies.
 
 ### The app name `codere-sample-mvc-legacy` is already taken
 
